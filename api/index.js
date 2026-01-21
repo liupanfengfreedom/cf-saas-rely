@@ -1,4 +1,9 @@
 export default async function handler(req, res) {
+    // --- 1. 添加 CORS 响应头 (允许任何前端工具调用) ---
+  res.setHeader('Access-Control-Allow-Origin', '*'); 
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
   // 1. 定义你的域名和 Worker 的对应关系
   const WORKER_MAP = {
     'ratingpage.xsoftware.top': 'https://my-rating-worker.liupanfengfreedom.workers.dev',
@@ -7,7 +12,12 @@ export default async function handler(req, res) {
 
   const { url, method, headers } = req;
   const host = headers.host; // 获取当前访问的域名
-
+  
+ // --- 2. 处理 OPTIONS 预检请求 (浏览器在发 POST 前会先发这个验证) ---
+  if (method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
   // 2. 根据域名选择目标 Worker
   // 如果找不到匹配的，默认去 my-rating-worker
   const WORKER_URL = WORKER_MAP[host] || WORKER_MAP['ratingpage.xsoftware.top'];
