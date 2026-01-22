@@ -1,63 +1,67 @@
 export default async function handler(req, res) {
-    // --- 1. 添加 CORS 响应头 (允许任何前端工具调用) ---
+  // --- 1. 添加 CORS 响应头 ---
   res.setHeader('Access-Control-Allow-Origin', '*'); 
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // 1. 定义你的域名和 Worker 的对应关系
+  const { url, method, headers } = req;
+  const host = headers.host; 
+
+  // 【Log】记录请求进入
+  console.log(`[Incoming Request] Method: ${method}, Host: ${host}, Path: ${url}`);
+
   const WORKER_MAP = {
     'ratingpage.xsoftware.top': 'https://my-rating-worker.liupanfengfreedom.workers.dev',
-    'kv.xsoftware.top': 'https://kv-demo.liupanfengfreedom.workers.dev', // 这是你新加的
-    'trans-test.xsoftware.online': 'https://kv-demo.liupanfengfreedom.workers.dev', // 这是你新加的
-
+    'kv.xsoftware.top': 'https://kv-demo.liupanfengfreedom.workers.dev',
+    'trans-test.xsoftware.online': 'https://kv-demo.liupanfengfreedom.workers.dev',
   };
 
-  const { url, method, headers } = req;
-  const host = headers.host; // 获取当前访问的域名
-  
- // --- 2. 处理 OPTIONS 预检请求 (浏览器在发 POST 前会先发这个验证) ---
   if (method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
-  // 2. 根据域名选择目标 Worker
-  // 如果找不到匹配的，默认去 my-rating-worker
+
   const WORKER_URL = WORKER_MAP[host] || WORKER_MAP['ratingpage.xsoftware.top'];
+  
+  // 【Log】记录匹配到的目标 Worker
+  console.log(`[Mapping] Host "${host}" matched to Worker: ${WORKER_URL}`);
 
   try {
-    // 2. 构造请求，只传递必要的 Header，避免冲突
     const targetUrl = `${WORKER_URL}${url}`;
-    
-    // 过滤掉原始请求中可能干扰 Worker 的 Host
+    console.log(`[Proxying] Forwarding to: ${targetUrl}`);
+
     const newHeaders = { ...headers };
     delete newHeaders.host; 
     delete newHeaders['x-forwarded-host'];
 
+    // 注意：如果 req.body 已经是对象，Vercel 可能会根据 Content-Type 自动解析
+    const requestBody = ['GET', 'HEAD'].includes(method) ? undefined : JSON.stringify(req.body);
+
     const response = await fetch(targetUrl, {
       method: method,
       headers: newHeaders,
-      body: ['GET', 'HEAD'].includes(method) ? undefined : JSON.stringify(req.body),
+      body: requestBody,
     });
 
-    // 3. 处理响应内容
+    // 【Log】记录目标响应状态
+    console.log(`[Response] Worker responded with status: ${response.status}`);
+
     const data = await response.arrayBuffer();
     const responseHeaders = new Headers(response.headers);
 
-    // 【关键修复】删除可能导致 ERR_INVALID_RESPONSE 的 Header
-    // Node.js fetch 会自动解压，所以必须删除这些压缩标记
     responseHeaders.delete('content-encoding');
     responseHeaders.delete('content-length');
     responseHeaders.delete('transfer-encoding');
     responseHeaders.delete('connection');
 
-    // 4. 将清洗后的 Header 发送给浏览器
     responseHeaders.forEach((value, key) => {
       res.setHeader(key, value);
     });
 
     res.status(response.status).send(Buffer.from(data));
   } catch (error) {
-    console.error('Relay Error:', error);
+    // 【Log】记录错误
+    console.error('[Relay Error] Stack:', error.stack);
     if (!res.headersSent) {
       res.status(500).send('Relay Error: ' + error.message);
     }
