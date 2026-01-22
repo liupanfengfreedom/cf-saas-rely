@@ -8,6 +8,8 @@ export default async function handler(req, res) {
   const WORKER_MAP = {
     'ratingpage.xsoftware.top': 'https://my-rating-worker.liupanfengfreedom.workers.dev',
     'kv.xsoftware.top': 'https://kv-demo.liupanfengfreedom.workers.dev', // 这是你新加的
+    'trans-test.xsoftware.online': 'https://www.google.com/', // 这是你新加的
+
   };
 
   const { url, method, headers } = req;
