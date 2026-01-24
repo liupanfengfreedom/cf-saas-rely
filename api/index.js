@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // --- 1. 添加 CORS 响应头 ---
+  // 1. CORS 处理
   res.setHeader('Access-Control-Allow-Origin', '*'); 
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -7,7 +7,6 @@ export default async function handler(req, res) {
   const { url, method, headers } = req;
   const host = headers.host; 
 
-  // 【Log】记录请求进入
   console.log(`[Incoming Request] Method: ${method}, Host: ${host}, Path: ${url}`);
 
   const WORKER_MAP = {
@@ -17,50 +16,54 @@ export default async function handler(req, res) {
   };
 
   if (method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   const WORKER_URL = WORKER_MAP[host] || WORKER_MAP['ratingpage.xsoftware.top'];
   
-  // 【Log】记录匹配到的目标 Worker
-  console.log(`[Mapping] Host "${host}" matched to Worker: ${WORKER_URL}`);
-
   try {
     const targetUrl = `${WORKER_URL}${url}`;
     console.log(`[Proxying] Forwarding to: ${targetUrl}`);
 
+    // --- 核心修复：清理 Headers ---
     const newHeaders = { ...headers };
+    
+    // 必须删除这些字段，让 fetch 自动生成新的
     delete newHeaders.host; 
+    delete newHeaders['content-length']; // 极其重要：防止长度不匹配
+    delete newHeaders['connection'];     // 防止连接管理冲突
     delete newHeaders['x-forwarded-host'];
+    delete newHeaders['x-forwarded-for'];
+    delete newHeaders['x-vcl-host']; // 建议删除 Vercel 自带的特殊头
 
-    // 注意：如果 req.body 已经是对象，Vercel 可能会根据 Content-Type 自动解析
-    const requestBody = ['GET', 'HEAD'].includes(method) ? undefined : JSON.stringify(req.body);
+    // 处理 Body
+    let requestBody = undefined;
+    if (!['GET', 'HEAD'].includes(method)) {
+      // Vercel 自动解析 req.body，我们需要把它转回字符串发送
+      requestBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    }
 
     const response = await fetch(targetUrl, {
       method: method,
       headers: newHeaders,
       body: requestBody,
+      redirect: 'follow'
     });
 
-    // 【Log】记录目标响应状态
     console.log(`[Response] Worker responded with status: ${response.status}`);
 
     const data = await response.arrayBuffer();
-    const responseHeaders = new Headers(response.headers);
-
-    responseHeaders.delete('content-encoding');
-    responseHeaders.delete('content-length');
-    responseHeaders.delete('transfer-encoding');
-    responseHeaders.delete('connection');
-
-    responseHeaders.forEach((value, key) => {
-      res.setHeader(key, value);
+    
+    // 转发目标响应头（排除一些逐段传输头）
+    response.headers.forEach((value, key) => {
+      const forbiddenHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection'];
+      if (!forbiddenHeaders.includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
     });
 
     res.status(response.status).send(Buffer.from(data));
   } catch (error) {
-    // 【Log】记录错误
     console.error('[Relay Error] Stack:', error.stack);
     if (!res.headersSent) {
       res.status(500).send('Relay Error: ' + error.message);
