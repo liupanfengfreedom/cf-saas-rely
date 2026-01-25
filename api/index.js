@@ -10,9 +10,10 @@ export default async function handler(req, res) {
   console.log(`[Incoming Request] Method: ${method}, Host: ${host}, Path: ${url}`);
 
   const WORKER_MAP = {
-    'ratingpage.xsoftware.top': 'https://my-rating-worker.liupanfengfreedom.workers.dev',
-    'kv.xsoftware.top': 'https://kv-demo.liupanfengfreedom.workers.dev',
-    'trans-test.xsoftware.online': 'https://kv-demo.liupanfengfreedom.workers.dev',
+    'ratingpage.xsoftware.top': 'https://my-rating-worker.liupanfengfreedom.workers.dev/',
+    'kv.xsoftware.top': 'https://kv-demo.liupanfengfreedom.workers.dev/',
+    'chatroom.xsoftware.top': 'https://realtime-chat-demo.liupanfengfreedom.workers.dev/',
+    'trans-test.xsoftware.online': 'https://kv-demo.liupanfengfreedom.workers.dev/',
   };
 
   if (method === 'OPTIONS') {
