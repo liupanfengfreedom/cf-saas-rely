@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const WORKER_URL = WORKER_MAP[host] || WORKER_MAP['ratingpage.xsoftware.top'];
+  const WORKER_URL = 'https://gateway-worker.liupanfengfreedom.workers.dev/';// WORKER_MAP[host] || WORKER_MAP['ratingpage.xsoftware.top'];
   
   try {
     const targetUrl = `${WORKER_URL}${url}`;
