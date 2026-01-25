@@ -28,15 +28,15 @@ export default async function handler(req, res) {
 
     // --- 核心修复：清理 Headers ---
     const newHeaders = { ...headers };
+    newHeaders['originhost'] = newHeaders.host; // 传递原始 Host 信息
     
     // 必须删除这些字段，让 fetch 自动生成新的
-    //delete newHeaders.host; 
+    delete newHeaders.host; 
     delete newHeaders['content-length']; // 极其重要：防止长度不匹配
     delete newHeaders['connection'];     // 防止连接管理冲突
     delete newHeaders['x-forwarded-host'];
     delete newHeaders['x-forwarded-for'];
     delete newHeaders['x-vcl-host']; // 建议删除 Vercel 自带的特殊头
-
     // 处理 Body
     let requestBody = undefined;
     if (!['GET', 'HEAD'].includes(method)) {
