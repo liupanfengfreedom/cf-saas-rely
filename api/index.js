@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const newHeaders = { ...headers };
     
     // 必须删除这些字段，让 fetch 自动生成新的
-    //delete newHeaders.host; 
+    delete newHeaders.host; 
     delete newHeaders['content-length']; // 极其重要：防止长度不匹配
     delete newHeaders['connection'];     // 防止连接管理冲突
     delete newHeaders['x-forwarded-host'];
